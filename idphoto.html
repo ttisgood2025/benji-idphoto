@@ -648,11 +648,14 @@
   const SETTINGS_KEY='idphoto.settings';
   const SETTINGS_VER=1;
 
-  // ---- 「检查更新」：GitHub Release 作主更新源（免费、无流量费）----
-  // 老版本 fallback 到 ECS manifest，保证 v5.21 及以前用户能升级到新版
-  const RELEASE_OWNER='ttisgood2025';
+  // ---- 「检查更新」：Gitee Release 主源 → GitHub Release → ECS manifest 兜底 ----
+  // Gitee 登录名是 humbleperson（显示名 ttisgood2025），API 必须用登录名
+  const RELEASE_OWNER='humbleperson';
   const RELEASE_REPO='benji-idphoto';
-  const UPDATE_API_URL='https://api.github.com/repos/'+RELEASE_OWNER+'/'+RELEASE_REPO+'/releases/latest';
+  const UPDATE_API_URLS=[
+    'https://gitee.com/api/v5/repos/'+RELEASE_OWNER+'/'+RELEASE_REPO+'/releases/latest',
+    'https://api.github.com/repos/ttisgood2025/benji-idphoto/releases/latest'
+  ];
   const UPDATE_FALLBACK_MANIFEST='http://47.92.148.209/file/tools/manifest.json';
   const DOWNLOAD_FILE_NAME='笨鸡离线证件照工具.html';
   function cmpVersion(a,b){
@@ -671,12 +674,14 @@
     return {version:version,latestUrl:asset.browser_download_url,fileName:DOWNLOAD_FILE_NAME,note:note};
   }
   async function fetchUpdateInfo(){
-    try{
-      const res=await fetch(UPDATE_API_URL,{cache:'no-store'});
-      if(!res.ok)throw new Error('HTTP '+res.status);
-      const info=parseRelease(await res.json());
-      if(info)return info;
-    }catch(e){/* GitHub 不可用则退回 ECS manifest */}
+    for(const url of UPDATE_API_URLS){
+      try{
+        const res=await fetch(url,{cache:'no-store'});
+        if(!res.ok)continue;
+        const info=parseRelease(await res.json());
+        if(info)return info;
+      }catch(e){/* 换下一个源 */}
+    }
     const res=await fetch(UPDATE_FALLBACK_MANIFEST,{cache:'no-store'});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const m=await res.json();
